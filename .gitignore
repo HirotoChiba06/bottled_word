@@ -1,12 +1,22 @@
-# SQLite DBファイルを無視
-db/*.db
+# Node.js / TypeScript
+node_modules/
+dist/
+*.tsbuildinfo
 
-# Pythonキャッシュファイル
+# Database
+db/*.db
+data/
+*.sqlite
+
+# Environment Variables
+.env
+
+# Python Legacy
 __pycache__/
 *.pyc
 
-# 環境ファイル
-.env
+# macOS
+.DS_Store
 
-# VSCodeなどの設定
+# Editor
 .vscode/
