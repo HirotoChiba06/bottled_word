@@ -6,6 +6,7 @@ dist/
 # Database
 db/*.db
 data/
+*.db
 *.sqlite
 
 # Environment Variables

@@ -1,0 +1,43 @@
+<%- include("partials/header", { title, theme, fontSize, anonymousUserKey }) %>
+
+<section class="page-title">
+  <p class="eyebrow">Settings</p>
+  <h1>オプション</h1>
+  <p>このブラウザだけに保存される、最低限の表示設定です。</p>
+</section>
+
+<% if (typeof saved !== "undefined") { %>
+  <div class="notice">設定を保存しました。</div>
+<% } %>
+
+<section class="panel narrow">
+  <form action="/settings" method="post" class="stack">
+    <fieldset>
+      <legend>文字サイズ</legend>
+      <label class="radio-row">
+        <input type="radio" name="fontSize" value="normal" <%= currentFontSize === "normal" ? "checked" : "" %>>
+        標準
+      </label>
+      <label class="radio-row">
+        <input type="radio" name="fontSize" value="large" <%= currentFontSize === "large" ? "checked" : "" %>>
+        大きめ
+      </label>
+    </fieldset>
+
+    <fieldset>
+      <legend>テーマ</legend>
+      <label class="radio-row">
+        <input type="radio" name="theme" value="day" <%= currentTheme === "day" ? "checked" : "" %>>
+        昼の浜辺
+      </label>
+      <label class="radio-row">
+        <input type="radio" name="theme" value="night" <%= currentTheme === "night" ? "checked" : "" %>>
+        夜の海
+      </label>
+    </fieldset>
+
+    <button type="submit">保存する</button>
+  </form>
+</section>
+
+<%- include("partials/footer") %>

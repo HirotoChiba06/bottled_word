@@ -1,10 +1,16 @@
 {
   "name": "bottled_word",
   "version": "1.0.0",
-  "description": "R7夏期WepApp、最終課題用",
-  "main": "index.js",
+  "description": "Bottled Word v2 - relay style anonymous bottle message SNS",
+  "main": "dist/server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "nodemon --watch src --watch views --watch public --ext ts,ejs,css --exec ts-node src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "db:init": "ts-node src/db/init.ts"
+  },
+  "engines": {
+    "node": ">=22 <23"
   },
   "repository": {
     "type": "git",
@@ -21,17 +27,17 @@
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
     "@types/cookie-parser": "^1.4.10",
-    "@types/express": "^5.0.6",
-    "@types/node": "^25.8.0",
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.10.7",
     "nodemon": "^3.1.14",
     "ts-node": "^10.9.2",
-    "typescript": "^6.0.3"
+    "typescript": "^5.7.3"
   },
   "dependencies": {
     "better-sqlite3": "^12.10.0",
     "cookie-parser": "^1.4.7",
     "dotenv": "^17.4.2",
-    "ejs": "^5.0.2",
-    "express": "^5.2.1"
+    "ejs": "^3.1.10",
+    "express": "^4.21.2"
   }
 }

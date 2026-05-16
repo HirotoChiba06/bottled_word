@@ -1,0 +1,72 @@
+<%- include("partials/header", { title, theme, fontSize, anonymousUserKey }) %>
+
+<section class="page-title">
+  <p class="eyebrow">Collection</p>
+  <h1>物置</h1>
+  <p>あなたが流した瓶、拾った瓶、書いたコメント、帰ってきた瓶をまとめて確認できます。</p>
+</section>
+
+<% if (notice === "sent") { %>
+  <div class="notice">ボトルを海へ流しました。</div>
+<% } %>
+<% if (notice === "commented") { %>
+  <div class="notice">コメントを添えて、ボトルをもう一度流しました。</div>
+<% } %>
+
+<section class="collection-grid">
+  <article class="panel">
+    <h2>自分が送ったメッセージ</h2>
+    <% if (collection.sentBottles.length === 0) { %>
+      <p class="hint">まだボトルを流していません。</p>
+    <% } %>
+    <% collection.sentBottles.forEach((bottle) => { %>
+      <div class="list-item">
+        <p class="message-body"><%= bottle.content %></p>
+        <p class="hint"><%= bottle.status === "returned" ? "帰還済み" : "漂流中" %> / <%= bottle.comment_count %> / <%= bottle.target_comment_count %> コメント</p>
+      </div>
+    <% }) %>
+  </article>
+
+  <article class="panel">
+    <h2>自分が受け取ったメッセージ</h2>
+    <% if (collection.receivedVisits.length === 0) { %>
+      <p class="hint">まだボトルを拾っていません。</p>
+    <% } %>
+    <% collection.receivedVisits.forEach((visit) => { %>
+      <div class="list-item">
+        <p class="message-body"><%= visit.bottle_content %></p>
+        <p class="hint"><%= visit.action === "commented" ? "コメント済み" : "閲覧" %> / <%= visit.visited_at %></p>
+      </div>
+    <% }) %>
+  </article>
+
+  <article class="panel">
+    <h2>自分が書いたコメント</h2>
+    <% if (collection.writtenComments.length === 0) { %>
+      <p class="hint">まだコメントを書いていません。</p>
+    <% } %>
+    <% collection.writtenComments.forEach((comment) => { %>
+      <div class="list-item">
+        <p class="message-body"><%= comment.content %></p>
+        <p class="hint">元のボトル: <%= comment.bottle_content %></p>
+      </div>
+    <% }) %>
+  </article>
+
+  <article class="panel">
+    <h2>帰ってきたボトルとコメント履歴</h2>
+    <% if (collection.returnedBottles.length === 0) { %>
+      <p class="hint">まだ帰ってきたボトルはありません。</p>
+    <% } %>
+    <% collection.returnedBottles.forEach((bottle) => { %>
+      <div class="list-item returned">
+        <p class="message-body"><%= bottle.content %></p>
+        <% bottle.comments.forEach((comment, index) => { %>
+          <p class="comment-line"><span>#<%= index + 1 %></span><%= comment.content %></p>
+        <% }) %>
+      </div>
+    <% }) %>
+  </article>
+</section>
+
+<%- include("partials/footer") %>

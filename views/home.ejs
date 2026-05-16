@@ -1,0 +1,59 @@
+<%- include("partials/header", { title, theme, fontSize, anonymousUserKey }) %>
+
+<section class="hero">
+  <div>
+    <p class="eyebrow">浜辺</p>
+    <h1>言葉を瓶に入れて、知らない誰かの岸へ。</h1>
+    <p>投稿されたメッセージは漂流し、3〜5人のコメントをまとってあなたの物置へ帰ってきます。</p>
+  </div>
+</section>
+
+<% if (errors.length > 0) { %>
+  <div class="alert">
+    <% errors.forEach((error) => { %>
+      <p><%= error %></p>
+    <% }) %>
+  </div>
+<% } %>
+
+<section class="two-column">
+  <article class="panel">
+    <div class="panel-heading">
+      <p class="eyebrow">Send</p>
+      <h2>メッセージを書く</h2>
+    </div>
+    <form action="/bottles" method="post" class="stack">
+      <label for="content">瓶に詰める言葉</label>
+      <textarea id="content" name="content" maxlength="<%= limits.bottleContent %>" rows="8" placeholder="今日、誰かにそっと渡したい言葉を書いてください。"><%= values.content ?? "" %></textarea>
+      <p class="hint"><%= limits.bottleContent %>文字以内。名前や連絡先は書かないでください。</p>
+      <button type="submit">海へ流す</button>
+    </form>
+  </article>
+
+  <article class="panel bottle-panel">
+    <div class="panel-heading">
+      <p class="eyebrow">Receive</p>
+      <h2>漂着したボトルを見る</h2>
+    </div>
+
+    <% if (bottle) { %>
+      <div class="bottle-card">
+        <p class="bottle-meta">コメント <%= bottle.comment_count %> / <%= bottle.target_comment_count %></p>
+        <p class="message-body"><%= bottle.content %></p>
+      </div>
+      <form action="/bottles/<%= bottle.id %>/comments" method="post" class="stack">
+        <label for="comment">このボトルに添えるコメント</label>
+        <textarea id="comment" name="content" maxlength="<%= limits.commentContent %>" rows="5" placeholder="短い返事をひとつ添えて、もう一度海へ流します。"><%= values.comment ?? "" %></textarea>
+        <p class="hint"><%= limits.commentContent %>文字以内。</p>
+        <button type="submit">コメントして流す</button>
+      </form>
+    <% } else { %>
+      <div class="empty-state">
+        <p>今この浜辺に漂着しているボトルはありません。</p>
+        <p class="hint">自分で流したボトルは、他の匿名ユーザーに届きます。</p>
+      </div>
+    <% } %>
+  </article>
+</section>
+
+<%- include("partials/footer") %>
