@@ -3,14 +3,17 @@ import type { Bottle, BottleComment, BottleVisit } from "../types";
 
 type Collection = {
   sentBottles: Bottle[];
-  receivedVisits: BottleVisit[];
+  receivedVisits: (BottleVisit & { bottle_content: string })[];
   writtenComments: (BottleComment & { bottle_content: string })[];
   returnedBottles: (Bottle & { comments: BottleComment[] })[];
 };
 
+// ボトルごとに帰還までの必要コメント数を3〜5件でランダム化する。
 function randomTargetCommentCount(): number {
   return Math.floor(Math.random() * 3) + 3;
 }
+
+
 
 export function createBottle(authorUserKey: string, content: string): void {
   getDb().prepare(`
@@ -19,8 +22,11 @@ export function createBottle(authorUserKey: string, content: string): void {
   `).run(authorUserKey, content, randomTargetCommentCount());
 }
 
+
+
 export function findRandomDriftingBottle(userKey: string): Bottle | undefined {
   const db = getDb();
+  // 漂流中のボトルのうち、自分のボトルとコメント済みのボトルは除外する。
   const bottle = db.prepare(`
     SELECT *
     FROM bottles
@@ -45,6 +51,8 @@ export function findRandomDriftingBottle(userKey: string): Bottle | undefined {
   return bottle;
 }
 
+
+
 export function addCommentToBottle(bottleId: number, userKey: string, content: string): { ok: true } | { ok: false; message: string } {
   const db = getDb();
   const bottle = db.prepare("SELECT * FROM bottles WHERE id = ?").get(bottleId) as Bottle | undefined;
@@ -66,6 +74,7 @@ export function addCommentToBottle(bottleId: number, userKey: string, content: s
     return { ok: false, message: "このボトルにはすでにコメント済みです。" };
   }
 
+  // コメント追加・履歴記録・帰還判定は一貫性が必要なのでtransactionでまとめている。
   const transaction = db.transaction(() => {
     db.prepare(`
       INSERT INTO bottle_comments (bottle_id, commenter_user_key, content)
@@ -93,6 +102,8 @@ export function addCommentToBottle(bottleId: number, userKey: string, content: s
   return { ok: true };
 }
 
+
+
 export function getCollection(userKey: string): Collection {
   const db = getDb();
   const sentBottles = db.prepare(`
@@ -108,7 +119,7 @@ export function getCollection(userKey: string): Collection {
     WHERE bottle_visits.visitor_user_key = ?
     ORDER BY bottle_visits.visited_at DESC
     LIMIT 30
-  `).all(userKey) as BottleVisit[];
+  `).all(userKey) as (BottleVisit & { bottle_content: string })[];
 
   const writtenComments = db.prepare(`
     SELECT bottle_comments.*, bottles.content AS bottle_content
@@ -137,3 +148,15 @@ export function getCollection(userKey: string): Collection {
 
   return { sentBottles, receivedVisits, writtenComments, returnedBottles };
 }
+
+/**
+ * 以降解決すべき設計課題
+ * 
+ * findRandomDriftingBottle が閲覧記録までしている。
+ * コメントエラー時にroute側で別ボトルが表示される可能性。
+ * 同時コメント時の comment_count 競合。
+ * ORDER BY RANDOM() はデータが増えると重い。
+ * viewするだけで毎回 viewed が増えるので履歴が膨らむ。
+ * 
+ * 後日対応。
+ */
