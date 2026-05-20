@@ -1,12 +1,32 @@
+/**
+ * Bottled Word メインルート
+ *
+ * この層では：
+ * - requestの受け取り
+ * - validation
+ * - response生成
+ * を担当する。
+ *
+ * DB操作や業務ロジックは service 層へ委譲する。
+ */
+
+
+
 import { Router } from "express";
 import { appConfig } from "../config";
 import { addCommentToBottle, createBottle, findRandomDriftingBottle, getCollection } from "../services/bottleService";
 
 export const router = Router();
 
+/**
+ * フォーム入力を安全に文字列化する。
+ * undefined や非文字列入力は空文字へ正規化する。
+ */
 function normalizeText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
+
+
 
 router.get("/", (req, res) => {
   const bottle = findRandomDriftingBottle(req.anonymousUserKey);
@@ -19,15 +39,17 @@ router.get("/", (req, res) => {
   });
 });
 
+
+
 router.post("/bottles", (req, res) => {
-  const content = normalizeText(req.body.content);
+  const bottleContent = normalizeText(req.body.content);
   const errors: string[] = [];
 
-  if (!content) {
+  if (!bottleContent) {
     errors.push("メッセージを入力してください。");
   }
 
-  if (content.length > appConfig.limits.bottleContent) {
+  if (bottleContent.length > appConfig.limits.bottleContent) {
     errors.push(`メッセージは${appConfig.limits.bottleContent}文字以内で入力してください。`);
   }
 
@@ -37,34 +59,37 @@ router.post("/bottles", (req, res) => {
       title: "浜辺",
       bottle,
       errors,
-      values: { content },
+      // エラー時の入力内容保持
+      values: { bottleContent },
       limits: appConfig.limits,
     });
   }
 
-  createBottle(req.anonymousUserKey, content);
+  createBottle(req.anonymousUserKey, bottleContent);
   return res.redirect("/collection?notice=sent");
 });
 
+
+
 router.post("/bottles/:id/comments", (req, res) => {
   const bottleId = Number(req.params.id);
-  const content = normalizeText(req.body.content);
+  const commentContent = normalizeText(req.body.content);
   const errors: string[] = [];
 
   if (!Number.isInteger(bottleId) || bottleId <= 0) {
     errors.push("ボトルの指定が正しくありません。");
   }
 
-  if (!content) {
+  if (!commentContent) {
     errors.push("コメントを入力してください。");
   }
 
-  if (content.length > appConfig.limits.commentContent) {
+  if (commentContent.length > appConfig.limits.commentContent) {
     errors.push(`コメントは${appConfig.limits.commentContent}文字以内で入力してください。`);
   }
 
   if (errors.length === 0) {
-    const result = addCommentToBottle(bottleId, req.anonymousUserKey, content);
+    const result = addCommentToBottle(bottleId, req.anonymousUserKey, commentContent);
     if (!result.ok) {
       errors.push(result.message);
     }
@@ -76,13 +101,16 @@ router.post("/bottles/:id/comments", (req, res) => {
       title: "浜辺",
       bottle,
       errors,
-      values: { comment: content },
+      // エラー時の入力内容保持
+      values: { commentContent },
       limits: appConfig.limits,
     });
   }
 
   return res.redirect("/collection?notice=commented");
 });
+
+
 
 router.get("/collection", (req, res) => {
   res.render("collection", {
@@ -91,6 +119,8 @@ router.get("/collection", (req, res) => {
     notice: req.query.notice,
   });
 });
+
+
 
 router.get("/settings", (req, res) => {
   res.render("settings", {

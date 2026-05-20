@@ -24,7 +24,7 @@
     </div>
     <form action="/bottles" method="post" class="stack">
       <label for="content">瓶に詰める言葉</label>
-      <textarea id="content" name="content" maxlength="<%= limits.bottleContent %>" rows="8" placeholder="今日、誰かにそっと渡したい言葉を書いてください。"><%= values.content ?? "" %></textarea>
+      <textarea id="content" name="content" maxlength="<%= limits.bottleContent %>" rows="8" placeholder="今日、誰かにそっと渡したい言葉を書いてください。"><%= values.bottleContent ?? "" %></textarea>
       <p class="hint"><%= limits.bottleContent %>文字以内。名前や連絡先は書かないでください。</p>
       <button type="submit">海へ流す</button>
     </form>
@@ -43,7 +43,7 @@
       </div>
       <form action="/bottles/<%= bottle.id %>/comments" method="post" class="stack">
         <label for="comment">このボトルに添えるコメント</label>
-        <textarea id="comment" name="content" maxlength="<%= limits.commentContent %>" rows="5" placeholder="短い返事をひとつ添えて、もう一度海へ流します。"><%= values.comment ?? "" %></textarea>
+        <textarea id="comment" name="content" maxlength="<%= limits.commentContent %>" rows="5" placeholder="短い返事をひとつ添えて、もう一度海へ流します。"><%= values.commentContent ?? "" %></textarea>
         <p class="hint"><%= limits.commentContent %>文字以内。</p>
         <button type="submit">コメントして流す</button>
       </form>
