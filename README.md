@@ -2,7 +2,7 @@
 
 Bottled Word は、匿名の投稿が複数のユーザーを巡り、コメントをまとって投稿者の元へ帰ってくるリレー型ボトルメッセージSNSです。
 
-このリポジトリは旧Flask版から、Node.js + TypeScript + Express + EJS + SQLite の v2 として再設計しました。ログインや個人情報は扱わず、ブラウザCookieの `anonymous_user_key` だけで自分の投稿・受信・コメント・帰還ボトルを管理します。
+このリポジトリは旧Flask版から、Node.js + TypeScript + Express + EJS + PostgreSQL の v2 として再設計しました。ログインや個人情報は扱わず、ブラウザCookieの `anonymous_user_key` だけで自分の投稿・受信・コメント・帰還ボトルを管理します。
 
 ## 技術構成
 
@@ -10,8 +10,8 @@ Bottled Word は、匿名の投稿が複数のユーザーを巡り、コメン�
 - TypeScript
 - Express
 - EJS
-- SQLite
-- better-sqlite3
+- PostgreSQL
+- pg
 - cookie-parser
 - dotenv
 - Docker / Docker Compose
@@ -42,7 +42,7 @@ Bottled Word は、匿名の投稿が複数のユーザーを巡り、コメン�
 
 ## DB設計
 
-SQLite DBは `data/bottled_word.sqlite` に作成されます。
+PostgreSQLへ `DATABASE_URL` で接続します。Render Postgresなどの空DBに対して、起動時または `npm run db:init` で必要なテーブルを作成します。
 
 ### anonymous_users
 

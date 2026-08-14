@@ -1,4 +1,4 @@
-import { getDb } from "../db/connection";
+import { getClient, query } from "../db/connection";
 import type { Bottle, BottleComment, BottleVisit } from "../types";
 
 type Collection = {
@@ -13,39 +13,56 @@ function randomTargetCommentCount(): number {
   return Math.floor(Math.random() * 3) + 3;
 }
 
+const bottleFields = `
+  id,
+  author_user_key,
+  content,
+  status,
+  target_comment_count,
+  comment_count,
+  created_at::text AS created_at,
+  returned_at::text AS returned_at
+`;
 
+const commentFields = `
+  id,
+  bottle_id,
+  commenter_user_key,
+  content,
+  created_at::text AS created_at
+`;
 
-export function createBottle(authorUserKey: string, content: string): void {
-  getDb().prepare(`
+export async function createBottle(authorUserKey: string, content: string): Promise<void> {
+  await query(`
     INSERT INTO bottles (author_user_key, content, target_comment_count)
-    VALUES (?, ?, ?)
-  `).run(authorUserKey, content, randomTargetCommentCount());
+    VALUES ($1, $2, $3)
+  `, [authorUserKey, content, randomTargetCommentCount()]);
 }
 
 
 
-export function findRandomDriftingBottle(userKey: string): Bottle | undefined {
-  const db = getDb();
+export async function findRandomDriftingBottle(userKey: string): Promise<Bottle | undefined> {
   // 漂流中のボトルのうち、自分のボトルとコメント済みのボトルは除外する。
-  const bottle = db.prepare(`
-    SELECT *
+  const bottles = await query<Bottle>(`
+    SELECT ${bottleFields}
     FROM bottles
     WHERE status = 'drifting'
-      AND author_user_key != ?
+      AND author_user_key != $1
       AND NOT EXISTS (
         SELECT 1 FROM bottle_comments
         WHERE bottle_comments.bottle_id = bottles.id
-          AND bottle_comments.commenter_user_key = ?
+          AND bottle_comments.commenter_user_key = $2
       )
     ORDER BY RANDOM()
     LIMIT 1
-  `).get(userKey, userKey) as Bottle | undefined;
+  `, [userKey, userKey]);
+  const bottle = bottles[0];
 
   if (bottle) {
-    db.prepare(`
+    await query(`
       INSERT INTO bottle_visits (bottle_id, visitor_user_key, action)
-      VALUES (?, ?, 'viewed')
-    `).run(bottle.id, userKey);
+      VALUES ($1, $2, 'viewed')
+    `, [bottle.id, userKey]);
   }
 
   return bottle;
@@ -53,98 +70,129 @@ export function findRandomDriftingBottle(userKey: string): Bottle | undefined {
 
 
 
-export function addCommentToBottle(bottleId: number, userKey: string, content: string): { ok: true } | { ok: false; message: string } {
-  const db = getDb();
-  const bottle = db.prepare("SELECT * FROM bottles WHERE id = ?").get(bottleId) as Bottle | undefined;
-
-  if (!bottle || bottle.status !== "drifting") {
-    return { ok: false, message: "このボトルはもう漂流していません。" };
-  }
-
-  if (bottle.author_user_key === userKey) {
-    return { ok: false, message: "自分が流したボトルにはコメントできません。" };
-  }
-
-  const alreadyCommented = db.prepare(`
-    SELECT id FROM bottle_comments
-    WHERE bottle_id = ? AND commenter_user_key = ?
-  `).get(bottleId, userKey);
-
-  if (alreadyCommented) {
-    return { ok: false, message: "このボトルにはすでにコメント済みです。" };
-  }
+export async function addCommentToBottle(bottleId: number, userKey: string, content: string): Promise<{ ok: true } | { ok: false; message: string }> {
+  const client = await getClient();
 
   // コメント追加・履歴記録・帰還判定は一貫性が必要なのでtransactionでまとめている。
-  const transaction = db.transaction(() => {
-    db.prepare(`
-      INSERT INTO bottle_comments (bottle_id, commenter_user_key, content)
-      VALUES (?, ?, ?)
-    `).run(bottleId, userKey, content);
+  try {
+    await client.query("BEGIN");
 
-    db.prepare(`
+    const bottleResult = await client.query<Bottle>(`
+      SELECT ${bottleFields}
+      FROM bottles
+      WHERE id = $1
+      FOR UPDATE
+    `, [bottleId]);
+    const bottle = bottleResult.rows[0];
+
+    if (!bottle || bottle.status !== "drifting") {
+      await client.query("ROLLBACK");
+      return { ok: false, message: "このボトルはもう漂流していません。" };
+    }
+
+    if (bottle.author_user_key === userKey) {
+      await client.query("ROLLBACK");
+      return { ok: false, message: "自分が流したボトルにはコメントできません。" };
+    }
+
+    const alreadyCommented = await client.query(`
+      SELECT id FROM bottle_comments
+      WHERE bottle_id = $1 AND commenter_user_key = $2
+    `, [bottleId, userKey]);
+
+    if (alreadyCommented.rowCount && alreadyCommented.rowCount > 0) {
+      await client.query("ROLLBACK");
+      return { ok: false, message: "このボトルにはすでにコメント済みです。" };
+    }
+
+    await client.query(`
+      INSERT INTO bottle_comments (bottle_id, commenter_user_key, content)
+      VALUES ($1, $2, $3)
+    `, [bottleId, userKey, content]);
+
+    await client.query(`
       INSERT INTO bottle_visits (bottle_id, visitor_user_key, action)
-      VALUES (?, ?, 'commented')
-    `).run(bottleId, userKey);
+      VALUES ($1, $2, 'commented')
+    `, [bottleId, userKey]);
 
     const newCount = bottle.comment_count + 1;
     const hasReturned = newCount >= bottle.target_comment_count;
 
-    db.prepare(`
+    await client.query(`
       UPDATE bottles
-      SET comment_count = ?,
-          status = ?,
-          returned_at = CASE WHEN ? THEN datetime('now') ELSE returned_at END
-      WHERE id = ?
-    `).run(newCount, hasReturned ? "returned" : "drifting", hasReturned ? 1 : 0, bottleId);
-  });
+      SET comment_count = $1,
+          status = $2,
+          returned_at = CASE WHEN $3::boolean THEN now() ELSE returned_at END
+      WHERE id = $4
+    `, [newCount, hasReturned ? "returned" : "drifting", hasReturned, bottleId]);
 
-  transaction();
-  return { ok: true };
+    await client.query("COMMIT");
+    return { ok: true };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 
 
-export function getCollection(userKey: string): Collection {
-  const db = getDb();
-  const sentBottles = db.prepare(`
-    SELECT * FROM bottles
-    WHERE author_user_key = ?
+export async function getCollection(userKey: string): Promise<Collection> {
+  const sentBottles = await query<Bottle>(`
+    SELECT ${bottleFields}
+    FROM bottles
+    WHERE author_user_key = $1
     ORDER BY created_at DESC
-  `).all(userKey) as Bottle[];
+  `, [userKey]);
 
-  const receivedVisits = db.prepare(`
-    SELECT bottle_visits.*, bottles.content AS bottle_content
+  const receivedVisits = await query<BottleVisit & { bottle_content: string }>(`
+    SELECT
+      bottle_visits.id,
+      bottle_visits.bottle_id,
+      bottle_visits.visitor_user_key,
+      bottle_visits.action,
+      bottle_visits.visited_at::text AS visited_at,
+      bottles.content AS bottle_content
     FROM bottle_visits
     JOIN bottles ON bottles.id = bottle_visits.bottle_id
-    WHERE bottle_visits.visitor_user_key = ?
+    WHERE bottle_visits.visitor_user_key = $1
     ORDER BY bottle_visits.visited_at DESC
     LIMIT 30
-  `).all(userKey) as (BottleVisit & { bottle_content: string })[];
+  `, [userKey]);
 
-  const writtenComments = db.prepare(`
-    SELECT bottle_comments.*, bottles.content AS bottle_content
+  const writtenComments = await query<BottleComment & { bottle_content: string }>(`
+    SELECT
+      bottle_comments.id,
+      bottle_comments.bottle_id,
+      bottle_comments.commenter_user_key,
+      bottle_comments.content,
+      bottle_comments.created_at::text AS created_at,
+      bottles.content AS bottle_content
     FROM bottle_comments
     JOIN bottles ON bottles.id = bottle_comments.bottle_id
-    WHERE bottle_comments.commenter_user_key = ?
+    WHERE bottle_comments.commenter_user_key = $1
     ORDER BY bottle_comments.created_at DESC
-  `).all(userKey) as (BottleComment & { bottle_content: string })[];
+  `, [userKey]);
 
-  const returnedBase = db.prepare(`
-    SELECT * FROM bottles
-    WHERE author_user_key = ? AND status = 'returned'
+  const returnedBase = await query<Bottle>(`
+    SELECT ${bottleFields}
+    FROM bottles
+    WHERE author_user_key = $1 AND status = 'returned'
     ORDER BY returned_at DESC
-  `).all(userKey) as Bottle[];
+  `, [userKey]);
 
-  const commentsByBottle = db.prepare(`
-    SELECT * FROM bottle_comments
-    WHERE bottle_id = ?
-    ORDER BY created_at ASC
-  `);
-
-  const returnedBottles = returnedBase.map((bottle) => ({
-    ...bottle,
-    comments: commentsByBottle.all(bottle.id) as BottleComment[],
-  }));
+  const returnedBottles = await Promise.all(
+    returnedBase.map(async (bottle) => ({
+      ...bottle,
+      comments: await query<BottleComment>(`
+        SELECT ${commentFields}
+        FROM bottle_comments
+        WHERE bottle_id = $1
+        ORDER BY created_at ASC
+      `, [bottle.id]),
+    })),
+  );
 
   return { sentBottles, receivedVisits, writtenComments, returnedBottles };
 }

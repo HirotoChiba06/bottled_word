@@ -1,17 +1,28 @@
-import fs from "fs";
-import path from "path";
-import Database from "better-sqlite3";
+import { Pool, type PoolClient, type QueryResultRow } from "pg";
 import { appConfig } from "../config";
 
-let db: Database.Database | null = null;
+let pool: Pool | null = null;
 
-export function getDb(): Database.Database {
-  if (!db) {
-    fs.mkdirSync(path.dirname(appConfig.dbPath), { recursive: true });
-    db = new Database(appConfig.dbPath);
-    db.pragma("journal_mode = WAL");
-    db.pragma("foreign_keys = ON");
+export function getPool(): Pool {
+  if (!appConfig.databaseUrl) {
+    throw new Error("DATABASE_URL is required to connect to PostgreSQL.");
   }
 
-  return db;
+  if (!pool) {
+    pool = new Pool({
+      connectionString: appConfig.databaseUrl,
+      ssl: appConfig.databaseSsl ? { rejectUnauthorized: false } : undefined,
+    });
+  }
+
+  return pool;
+}
+
+export async function query<T extends QueryResultRow>(text: string, values: unknown[] = []): Promise<T[]> {
+  const result = await getPool().query<T>(text, values);
+  return result.rows;
+}
+
+export async function getClient(): Promise<PoolClient> {
+  return getPool().connect();
 }

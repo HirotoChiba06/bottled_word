@@ -7,8 +7,6 @@ import { initializeDatabase } from "./db/init";
 import { anonymousUserMiddleware } from "./middleware/anonymousUser";
 import { router } from "./routes";
 
-initializeDatabase();
-
 const app = express();
 
 app.set("view engine", "ejs");
@@ -29,6 +27,13 @@ app.use((_req, res) => {
   res.status(404).render("not-found", { title: "見つかりません" });
 });
 
-app.listen(appConfig.port, () => {
-  console.log(`Bottled Word is running on http://localhost:${appConfig.port}`);
-});
+initializeDatabase()
+  .then(() => {
+    app.listen(appConfig.port, () => {
+      console.log(`Bottled Word is running on http://localhost:${appConfig.port}`);
+    });
+  })
+  .catch((error: unknown) => {
+    console.error("Failed to initialize database.", error);
+    process.exit(1);
+  });

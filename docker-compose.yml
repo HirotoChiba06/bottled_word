@@ -6,6 +6,17 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
-      DATABASE_PATH: /app/data/bottled_word.sqlite
+      DATABASE_URL: postgres://postgres:postgres@db:5432/bottled_word
+    depends_on:
+      - db
+  db:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: bottled_word
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
     volumes:
-      - ./data:/app/data
+      - postgres-data:/var/lib/postgresql/data
+
+volumes:
+  postgres-data:

@@ -12,11 +12,19 @@
 
 
 
-import { Router } from "express";
+import { Router, type NextFunction, type Request, type Response } from "express";
 import { appConfig } from "../config";
 import { addCommentToBottle, createBottle, findRandomDriftingBottle, getCollection } from "../services/bottleService";
 
 export const router = Router();
+
+type AsyncRouteHandler = (req: Request, res: Response, next: NextFunction) => Promise<void>;
+
+function asyncRoute(handler: AsyncRouteHandler): (req: Request, res: Response, next: NextFunction) => void {
+  return (req, res, next) => {
+    handler(req, res, next).catch(next);
+  };
+}
 
 /**
  * フォーム入力を安全に文字列化する。
@@ -28,8 +36,8 @@ function normalizeText(value: unknown): string {
 
 
 
-router.get("/", (req, res) => {
-  const bottle = findRandomDriftingBottle(req.anonymousUserKey);
+router.get("/", asyncRoute(async (req, res) => {
+  const bottle = await findRandomDriftingBottle(req.anonymousUserKey);
   res.render("home", {
     title: "浜辺",
     bottle,
@@ -37,11 +45,11 @@ router.get("/", (req, res) => {
     values: {},
     limits: appConfig.limits,
   });
-});
+}));
 
 
 
-router.post("/bottles", (req, res) => {
+router.post("/bottles", asyncRoute(async (req, res) => {
   const bottleContent = normalizeText(req.body.content);
   const errors: string[] = [];
 
@@ -54,8 +62,8 @@ router.post("/bottles", (req, res) => {
   }
 
   if (errors.length > 0) {
-    const bottle = findRandomDriftingBottle(req.anonymousUserKey);
-    return res.status(400).render("home", {
+    const bottle = await findRandomDriftingBottle(req.anonymousUserKey);
+    res.status(400).render("home", {
       title: "浜辺",
       bottle,
       errors,
@@ -63,15 +71,16 @@ router.post("/bottles", (req, res) => {
       values: { bottleContent },
       limits: appConfig.limits,
     });
+    return;
   }
 
-  createBottle(req.anonymousUserKey, bottleContent);
-  return res.redirect("/collection?notice=sent");
-});
+  await createBottle(req.anonymousUserKey, bottleContent);
+  res.redirect("/collection?notice=sent");
+}));
 
 
 
-router.post("/bottles/:id/comments", (req, res) => {
+router.post("/bottles/:id/comments", asyncRoute(async (req, res) => {
   const bottleId = Number(req.params.id);
   const commentContent = normalizeText(req.body.content);
   const errors: string[] = [];
@@ -89,15 +98,15 @@ router.post("/bottles/:id/comments", (req, res) => {
   }
 
   if (errors.length === 0) {
-    const result = addCommentToBottle(bottleId, req.anonymousUserKey, commentContent);
+    const result = await addCommentToBottle(bottleId, req.anonymousUserKey, commentContent);
     if (!result.ok) {
       errors.push(result.message);
     }
   }
 
   if (errors.length > 0) {
-    const bottle = findRandomDriftingBottle(req.anonymousUserKey);
-    return res.status(400).render("home", {
+    const bottle = await findRandomDriftingBottle(req.anonymousUserKey);
+    res.status(400).render("home", {
       title: "浜辺",
       bottle,
       errors,
@@ -105,20 +114,21 @@ router.post("/bottles/:id/comments", (req, res) => {
       values: { commentContent },
       limits: appConfig.limits,
     });
+    return;
   }
 
-  return res.redirect("/collection?notice=commented");
-});
+  res.redirect("/collection?notice=commented");
+}));
 
 
 
-router.get("/collection", (req, res) => {
+router.get("/collection", asyncRoute(async (req, res) => {
   res.render("collection", {
     title: "物置",
-    collection: getCollection(req.anonymousUserKey),
+    collection: await getCollection(req.anonymousUserKey),
     notice: req.query.notice,
   });
-});
+}));
 
 
 
