@@ -6,7 +6,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
-      DATABASE_URL: postgres://postgres:postgres@db:5432/bottled_word
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/bottled_word
     depends_on:
       - db
   db:
@@ -15,6 +15,8 @@ services:
       POSTGRES_DB: bottled_word
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
 
