@@ -1,13 +1,5 @@
 <%- include("partials/header", { title, theme, fontSize, anonymousUserKey }) %>
 
-<section class="hero">
-  <div>
-    <p class="eyebrow">浜辺</p>
-    <h1>言葉を瓶に入れて、知らない誰かの岸へ。</h1>
-    <p>投稿されたメッセージは漂流し、3〜5人のコメントをまとってあなたの物置へ帰ってきます。</p>
-  </div>
-</section>
-
 <% if (errors.length > 0) { %>
   <div class="alert">
     <% errors.forEach((error) => { %>
@@ -20,13 +12,17 @@
   <article class="panel">
     <div class="panel-heading">
       <p class="eyebrow">Send</p>
-      <h2>メッセージを書く</h2>
+      <h1 class="panel-title">メッセージを書く</h1>
+    </div>
     </div>
     <form action="/bottles" method="post" class="stack">
       <label for="content">瓶に詰める言葉</label>
       <textarea id="content" name="content" maxlength="<%= limits.bottleContent %>" rows="8" placeholder="今日、誰かにそっと渡したい言葉を書いてください。"><%= values.bottleContent ?? "" %></textarea>
+      <span id="content-count" >
+        0 / <%= limits.bottleContent %>
+      </span>
       <p class="hint"><%= limits.bottleContent %>文字以内。名前や連絡先は書かないでください。</p>
-      <button type="submit">海へ流す</button>
+      <button class="primary-action" type="submit">海へ流す</button>
     </form>
   </article>
 
@@ -55,5 +51,18 @@
     <% } %>
   </article>
 </section>
+
+<script>
+  const textarea = document.querySelector("#content");
+  const counter = document.querySelector("#content-count");
+
+  function updateCounter() {
+    counter.textContent = `${textarea.value.length} / ${textarea.maxLength}`;
+  }
+
+  updateCounter();
+
+  textarea.addEventListener("input", updateCounter);
+</script>
 
 <%- include("partials/footer") %>
